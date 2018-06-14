@@ -182,15 +182,17 @@ def setup_plexserver(
         # add devices with a session and no client (ex. PlexConnect Apple TV's)
         if config.get(CONF_INCLUDE_NON_CLIENTS):
             for machine_identifier, session in plex_sessions.items():
-                if (machine_identifier not in plex_clients
-                        and machine_identifier is not None):
-                    new_client = PlexClient(config, None, session,
-                                            plex_sessions, update_devices,
-                                            update_sessions)
-                    plex_clients[machine_identifier] = new_client
-                    new_plex_clients.append(new_client)
-                else:
-                    plex_clients[machine_identifier].refresh(None, session)
+                if machine_identifier is not None and \
+                        machine_identifier not in available_client_ids:
+                    available_client_ids.append(machine_identifier)
+                    if machine_identifier not in plex_clients:
+                        new_client = PlexClient(config, None, session,
+                                                plex_sessions, update_devices,
+                                                update_sessions)
+                        plex_clients[machine_identifier] = new_client
+                        new_plex_clients.append(new_client)
+                    else:
+                        plex_clients[machine_identifier].refresh(None, session)
 
         clients_to_remove = []
         for client in plex_clients.values():
@@ -343,7 +345,7 @@ class PlexClient(MediaPlayerDevice):
                 if self.name:
                     self.entity_id = "%s.%s%s" % (
                         'media_player', prefix,
-                        self.name.lower().replace('-', '_'))
+                        self.name.lower().replace('-', '_').replace(' ', '_'))
 
     def _clear_media_details(self):
         """Set all Media Items to None."""
@@ -391,16 +393,14 @@ class PlexClient(MediaPlayerDevice):
                     self._device.machineIdentifier, None)
 
         if self._session:
-            if self._device.machineIdentifier is not None and \
-                    self._session.players:
+            if self._session.players:
                 self._is_player_available = True
-                self._player = [p for p in self._session.players
-                                if p.machineIdentifier ==
-                                self._device.machineIdentifier][0]
+                self._player = self._session.players[0]
                 self._name = self._player.title
                 self._player_state = self._player.state
                 self._session_username = self._session.usernames[0]
                 self._make = self._player.device
+                self._machine_identifier = self._player.machineIdentifier
             else:
                 self._is_player_available = False
             self._media_position = self._session.viewOffset
